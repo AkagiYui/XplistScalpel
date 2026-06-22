@@ -1,0 +1,52 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build unsigned macOS app
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select latest Xcode
+        run: |
+          latest=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          echo "Using $latest"
+          sudo xcode-select -s "$latest"
+          xcodebuild -version
+
+      - name: Build (unsigned)
+        run: |
+          xcodebuild \
+            -project XplistScalpel.xcodeproj \
+            -scheme XplistScalpel \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      - name: Package .app into a zip
+        run: |
+          cd build/Build/Products/Release
+          ditto -c -k --keepParent XplistScalpel.app XplistScalpel-unsigned.zip
+          ls -lh XplistScalpel-unsigned.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: XplistScalpel-unsigned
+          path: build/Build/Products/Release/XplistScalpel-unsigned.zip
+          if-no-files-found: error
