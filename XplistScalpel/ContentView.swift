@@ -2,65 +2,92 @@
 //  ContentView.swift
 //  XplistScalpel
 //
-//  Created by alya on 22/6/26.
+//  Top-level window layout: action bar, tab strip, the editor (tree or source)
+//  with an optional find bar, and the status bar. Hosts the open/save dialogs.
 //
 
 import SwiftUI
-import SwiftData
+import UniformTypeIdentifiers
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
+    @Bindable var app: AppModel
+
+    private let openTypes: [UTType] = [.propertyList, .xml, .data, .item]
 
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
-                }
-                .onDelete(perform: deleteItems)
-            }
-#if os(macOS)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-#endif
-            .toolbar {
-#if os(iOS)
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    EditButton()
-                }
-#endif
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
-            }
-        } detail: {
-            Text("Select an item")
-        }
-    }
+        VStack(spacing: 0) {
+            ToolbarBar(app: app)
+            Divider()
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
+            if !app.documents.isEmpty {
+                TabStrip(app: app)
+                Divider()
+            }
 
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+            if let doc = app.activeDocument {
+                if app.showFind {
+                    FindBar(doc: doc, app: app)
+                    Divider()
+                }
+                if app.showSource {
+                    SourceView(doc: doc)
+                } else {
+                    ColumnHeader()
+                    TreeEditorView(doc: doc)
+                }
+                Divider()
+                StatusBar(doc: doc)
+            } else {
+                WelcomeView(app: app)
             }
         }
+        .frame(minWidth: 840, minHeight: 540)
+        .fileImporter(isPresented: $app.isOpenPanelPresented,
+                      allowedContentTypes: openTypes,
+                      allowsMultipleSelection: true) { result in
+            if case .success(let urls) = result {
+                for url in urls {
+                    let scoped = url.startAccessingSecurityScopedResource()
+                    app.open(url: url)
+                    if scoped { url.stopAccessingSecurityScopedResource() }
+                }
+            }
+        }
+        .fileExporter(isPresented: $app.isExportPanelPresented,
+                      document: PlistExportFile(data: app.exportData),
+                      contentType: .propertyList,
+                      defaultFilename: app.activeDocument?.displayName ?? "Untitled") { result in
+            if case .success(let url) = result { app.didExport(to: url) }
+        }
+        .dropDestination(for: URL.self) { urls, _ in
+            for url in urls { app.open(url: url) }
+            return !urls.isEmpty
+        }
+        .alert("Error", isPresented: Binding(
+            get: { app.lastError != nil },
+            set: { if !$0 { app.lastError = nil } }
+        )) {
+            Button("OK") { app.lastError = nil }
+        } message: {
+            Text(app.lastError ?? "")
+        }
+        .confirmationDialog(
+            "Do you want to close this file without saving?",
+            isPresented: Binding(
+                get: { app.pendingCloseDocID != nil },
+                set: { if !$0 { app.pendingCloseDocID = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button("Close Without Saving", role: .destructive) {
+                if let id = app.pendingCloseDocID,
+                   let doc = app.documents.first(where: { $0.id == id }) {
+                    app.close(doc)
+                }
+            }
+            Button("Cancel", role: .cancel) { app.pendingCloseDocID = nil }
+        } message: {
+            Text("Your changes will be lost if you don't save them.")
+        }
     }
-}
-
-#Preview {
-    ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
 }
