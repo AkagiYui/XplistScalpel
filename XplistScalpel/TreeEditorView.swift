@@ -25,10 +25,11 @@ struct ColumnHeader: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.leading, 6)
         }
+        .frame(height: 16)   // bound the height so the vertical Dividers don't make the row greedy
         .font(.caption.bold())
         .foregroundStyle(.secondary)
         .padding(.horizontal, 12)
-        .padding(.vertical, 5)
+        .padding(.vertical, 4)
         .background(.bar)
     }
 }
