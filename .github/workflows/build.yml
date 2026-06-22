@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Select latest Xcode
         run: |
@@ -45,7 +45,7 @@ jobs:
           ls -lh XplistScalpel-unsigned.zip
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: XplistScalpel-unsigned
           path: build/Build/Products/Release/XplistScalpel-unsigned.zip
