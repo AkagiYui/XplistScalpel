@@ -35,8 +35,8 @@ struct AppCommands: Commands {
             Button("Open…") { app.requestOpen() }
                 .keyboardShortcut("o")
             Menu("Open Recent") {
-                ForEach(app.recentFiles, id: \.self) { url in
-                    Button(url.lastPathComponent) { app.open(url: url) }
+                ForEach(app.recentFiles.indices, id: \.self) { index in
+                    Button(app.recentFiles[index].lastPathComponent) { app.openRecent(at: index) }
                 }
                 if !app.recentFiles.isEmpty {
                     Divider()

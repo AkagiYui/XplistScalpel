@@ -34,7 +34,10 @@ final class AppModel {
     /// Document pending a close confirmation because it has unsaved changes.
     var pendingCloseDocID: UUID?
 
-    private let recentsKey = "RecentFiles"
+    /// Security-scoped bookmarks backing `recentFiles`, persisted across
+    /// launches so recently-opened files can be reopened under App Sandbox.
+    @ObservationIgnored private var recentBookmarks: [Data] = []
+    private let bookmarksKey = "RecentBookmarks"
     private let maxRecents = 12
 
     var activeDocument: PlistDocument? {
@@ -59,15 +62,22 @@ final class AppModel {
             activeDocumentID = existing.id
             return
         }
+        // Under App Sandbox the URL arrives with a security scope (from the
+        // open panel, drag-drop, Launch Services, or a resolved bookmark).
+        // Start accessing it now and keep the grant alive for the document's
+        // lifetime so later saves back to the same file succeed.
+        let scoped = url.startAccessingSecurityScopedResource()
         do {
             let data = try Data(contentsOf: url)
             let (root, format) = try PlistEngine.load(data: data)
             let doc = PlistDocument(root: root, fileURL: url, format: format)
+            doc.isSecurityScoped = scoped
             documents.append(doc)
             activeDocumentID = doc.id
             showSource = false
             addRecent(url)
         } catch {
+            if scoped { url.stopAccessingSecurityScopedResource() }
             lastError = "Couldn't open \(url.lastPathComponent):\n\(error.localizedDescription)"
         }
     }
@@ -83,6 +93,10 @@ final class AppModel {
 
     func close(_ doc: PlistDocument) {
         guard let index = documents.firstIndex(where: { $0.id == doc.id }) else { return }
+        if doc.isSecurityScoped, let url = doc.fileURL {
+            url.stopAccessingSecurityScopedResource()
+            doc.isSecurityScoped = false
+        }
         documents.remove(at: index)
         if activeDocumentID == doc.id {
             let newIndex = min(index, documents.count - 1)
@@ -126,7 +140,15 @@ final class AppModel {
     /// Completion handler for the Save As exporter.
     func didExport(to url: URL) {
         guard let id = exportTargetID, let doc = documents.first(where: { $0.id == id }) else { return }
+        // The Save panel grants a fresh security scope on the chosen URL.
+        let scoped = url.startAccessingSecurityScopedResource()
+        // Release the scope held on the previous file URL, if it differs.
+        if doc.isSecurityScoped, let oldURL = doc.fileURL,
+           oldURL.standardizedFileURL != url.standardizedFileURL {
+            oldURL.stopAccessingSecurityScopedResource()
+        }
         doc.fileURL = url
+        doc.isSecurityScoped = scoped
         doc.isDirty = false
         addRecent(url)
         exportTargetID = nil
@@ -178,19 +200,89 @@ final class AppModel {
     // MARK: - Recent files
 
     private func loadRecents() {
-        let paths = UserDefaults.standard.stringArray(forKey: recentsKey) ?? []
-        recentFiles = paths.map { URL(fileURLWithPath: $0) }
+        let stored = UserDefaults.standard.array(forKey: bookmarksKey) as? [Data] ?? []
+        recentBookmarks = []
+        recentFiles = []
+        for data in stored {
+            var stale = false
+            guard let url = try? URL(
+                resolvingBookmarkData: data,
+                options: [],
+                relativeTo: nil,
+                bookmarkDataIsStale: &stale) else { continue }
+            // Drop bookmarks that no longer resolve (file moved/deleted) so the
+            // display list and bookmark list stay index-aligned.
+            recentBookmarks.append(data)
+            recentFiles.append(url)
+        }
     }
 
     private func addRecent(_ url: URL) {
-        recentFiles.removeAll { $0.standardizedFileURL == url.standardizedFileURL }
+        // The caller already holds a security scope on `url` (open/save path),
+        // which is required to create a security-scoped bookmark. Fall back to a
+        // plain bookmark for the unsandboxed dev build.
+        let data = (try? url.bookmarkData(
+            options: .withSecurityScope,
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil))
+            ?? (try? url.bookmarkData(
+                options: [],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil))
+        guard let data else { return }
+
+        let standard = url.standardizedFileURL
+        let dupIndex = recentFiles.firstIndex { $0.standardizedFileURL == standard }
+        if let dupIndex {
+            recentFiles.remove(at: dupIndex)
+            recentBookmarks.remove(at: dupIndex)
+        }
         recentFiles.insert(url, at: 0)
-        if recentFiles.count > maxRecents { recentFiles = Array(recentFiles.prefix(maxRecents)) }
-        UserDefaults.standard.set(recentFiles.map { $0.path }, forKey: recentsKey)
+        recentBookmarks.insert(data, at: 0)
+        if recentBookmarks.count > maxRecents {
+            recentBookmarks = Array(recentBookmarks.prefix(maxRecents))
+            recentFiles = Array(recentFiles.prefix(maxRecents))
+        }
+        persistRecents()
+    }
+
+    /// Reopens a recent file by index, resolving its security-scoped bookmark
+    /// fresh (the load-time display URL carries no usable scope).
+    func openRecent(at index: Int) {
+        guard recentFiles.indices.contains(index),
+              recentBookmarks.indices.contains(index) else { return }
+        var stale = false
+        guard let url = try? URL(
+            resolvingBookmarkData: recentBookmarks[index],
+            options: .withSecurityScope,
+            relativeTo: nil,
+            bookmarkDataIsStale: &stale) else {
+            // Bookmark is dead — drop it and refresh.
+            recentFiles.remove(at: index)
+            recentBookmarks.remove(at: index)
+            persistRecents()
+            return
+        }
+        if stale {
+            // Refresh the stale bookmark in place if we still have access.
+            if let fresh = try? url.bookmarkData(
+                options: .withSecurityScope,
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil) {
+                recentBookmarks[index] = fresh
+                persistRecents()
+            }
+        }
+        open(url: url)
+    }
+
+    private func persistRecents() {
+        UserDefaults.standard.set(recentBookmarks, forKey: bookmarksKey)
     }
 
     func clearRecents() {
         recentFiles = []
-        UserDefaults.standard.removeObject(forKey: recentsKey)
+        recentBookmarks = []
+        UserDefaults.standard.removeObject(forKey: bookmarksKey)
     }
 }

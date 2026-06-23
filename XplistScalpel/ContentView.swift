@@ -47,9 +47,7 @@ struct ContentView: View {
                       allowsMultipleSelection: true) { result in
             if case .success(let urls) = result {
                 for url in urls {
-                    let scoped = url.startAccessingSecurityScopedResource()
                     app.open(url: url)
-                    if scoped { url.stopAccessingSecurityScopedResource() }
                 }
             }
         }

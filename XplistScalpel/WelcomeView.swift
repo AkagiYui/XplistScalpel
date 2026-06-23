@@ -37,9 +37,9 @@ struct WelcomeView: View {
                     Text("Recent")
                         .font(.headline)
                         .foregroundStyle(.secondary)
-                    ForEach(app.recentFiles.prefix(6), id: \.self) { url in
-                        Button { app.open(url: url) } label: {
-                            Label(url.lastPathComponent, systemImage: "clock")
+                    ForEach(app.recentFiles.indices.prefix(6), id: \.self) { index in
+                        Button { app.openRecent(at: index) } label: {
+                            Label(app.recentFiles[index].lastPathComponent, systemImage: "clock")
                                 .lineLimit(1)
                         }
                         .buttonStyle(.link)

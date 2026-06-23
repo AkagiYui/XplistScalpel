@@ -61,8 +61,10 @@ standalone with `swiftc` (see *Testing* below).
 - macOS 15.7+
 - Xcode 26.1+
 
-The app runs unsandboxed for unrestricted local file access (matching Xplist, a
-desktop developer tool).
+The app runs **App Sandbox**-enabled (required for the Mac App Store). It reads
+and writes only files the user explicitly selects (open panel, drag-and-drop,
+Launch Services "Open With"), plus recently-opened files recalled via
+app-scoped security bookmarks.
 
 ## Building
 

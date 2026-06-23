@@ -27,6 +27,11 @@ final class PlistDocument: Identifiable {
     var format: PlistFileFormat
     var isDirty: Bool = false
 
+    /// True while this document holds an active security-scoped-resource grant
+    /// on `fileURL` (App Sandbox). The grant is started when the file is opened
+    /// and released when the tab is closed.
+    @ObservationIgnored var isSecurityScoped: Bool = false
+
     var selection: Set<UUID> = []
     var visibleRows: [RowItem] = []
     /// Set to request the editor scroll a given row into view.
