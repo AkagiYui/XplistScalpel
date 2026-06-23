@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- Required for Mac App Store: declares the app's category. -->
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.developer-tools</string>
+
 	<!-- Declares that XplistScalpel opens property-list files, so it appears in
 	     Finder's "Open With" menu and can be set as the handler for .plist.
 	     Merged into the generated Info.plist at build time. -->
