@@ -15,8 +15,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				XplistScalpel.entitlements,
-				Resources/app-icon-source.svg,
+				"Resources/app-icon-source.svg",
 			);
 			target = 01ABE47D2FE8E17E008C99EA /* XplistScalpel */;
 		};

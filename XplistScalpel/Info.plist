@@ -6,6 +6,12 @@
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.developer-tools</string>
 
+	<!-- Export compliance: the app uses only standard system encryption
+	     (HTTPS via system frameworks), so it is exempt. Setting this skips
+	     the per-upload encryption questionnaire in App Store Connect. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+
 	<!-- Declares that XplistScalpel opens property-list files, so it appears in
 	     Finder's "Open With" menu and can be set as the handler for .plist.
 	     Merged into the generated Info.plist at build time. -->
