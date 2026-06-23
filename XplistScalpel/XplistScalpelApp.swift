@@ -7,9 +7,33 @@
 
 import SwiftUI
 
+/// Handles files handed to the app outside of SwiftUI's `.onOpenURL`:
+///   - command-line arguments (`XplistScalpel path/to/file.plist`)
+///   - Launch Services `application(_:open:)` (double-click, `open -a`, "Open With")
+/// `.onOpenURL` alone only fires for some activation paths; this delegate
+/// covers the rest so the app reliably opens files passed any way.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    let app = AppModel()
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // Open any plist paths passed as command-line arguments.
+        let args = CommandLine.arguments.dropFirst()
+        for arg in args {
+            let url = URL(fileURLWithPath: arg)
+            if url.pathExtension.lowercased() == "plist" { app.open(url: url) }
+        }
+    }
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls { app.open(url: url) }
+    }
+}
+
 @main
 struct XplistScalpelApp: App {
-    @State private var app = AppModel()
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
+    private var app: AppModel { appDelegate.app }
 
     var body: some Scene {
         WindowGroup {
