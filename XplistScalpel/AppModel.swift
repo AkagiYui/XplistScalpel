@@ -58,6 +58,7 @@ final class AppModel {
     }
 
     func open(url: URL) {
+        NSLog("[XS] open url=\(url.path) isFileURL=\(url.isFileURL) scopedGrant=start")
         if let existing = documents.first(where: { $0.fileURL?.standardizedFileURL == url.standardizedFileURL }) {
             activeDocumentID = existing.id
             return
@@ -67,6 +68,7 @@ final class AppModel {
         // Start accessing it now and keep the grant alive for the document's
         // lifetime so later saves back to the same file succeed.
         let scoped = url.startAccessingSecurityScopedResource()
+        NSLog("[XS] startAccessing returned \(scoped)")
         do {
             let data = try Data(contentsOf: url)
             let (root, format) = try PlistEngine.load(data: data)
@@ -77,6 +79,7 @@ final class AppModel {
             showSource = false
             addRecent(url)
         } catch {
+            NSLog("[XS] open FAILED: \(error)")
             if scoped { url.stopAccessingSecurityScopedResource() }
             lastError = "Couldn't open \(url.lastPathComponent):\n\(error.localizedDescription)"
         }

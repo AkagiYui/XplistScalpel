@@ -16,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let app = AppModel()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        NSLog("[XS] didFinishLaunching args=\(CommandLine.arguments.dropFirst().map(\.self))")
         // Open any plist paths passed as command-line arguments.
         let args = CommandLine.arguments.dropFirst()
         for arg in args {
@@ -24,7 +25,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // Legacy 4-arg form — reliable for Launch Services file handoff on macOS.
+    func application(_ application: NSApplication, openFiles filenames: [String]) {
+        NSLog("[XS] openFiles delegate \(filenames)")
+        for name in filenames {
+            let url = URL(fileURLWithPath: name)
+            if url.pathExtension.lowercased() == "plist" { app.open(url: url) }
+        }
+    }
+
     func application(_ application: NSApplication, open urls: [URL]) {
+        NSLog("[XS] application(_:open:) delegate \(urls.map(\.path))")
         for url in urls { app.open(url: url) }
     }
 }
