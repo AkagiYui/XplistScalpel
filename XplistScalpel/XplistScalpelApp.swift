@@ -7,6 +7,12 @@
 
 import SwiftUI
 
+/// Identifier for the app's single main window, shared by the scene, the
+/// reopen menu command, and `AppModel.showMainWindow`.
+enum AppWindow {
+    static let mainID = "main"
+}
+
 /// Handles files handed to the app outside of SwiftUI's `.onOpenURL`:
 ///   - command-line arguments (`XplistScalpel path/to/file.plist`)
 ///   - Launch Services `application(_:open:)` (double-click, `open -a`, "Open With")
@@ -47,13 +53,28 @@ struct XplistScalpelApp: App {
     private var app: AppModel { appDelegate.app }
 
     var body: some Scene {
-        WindowGroup {
+        // A single unique `Window` (not `WindowGroup`): the app is single-window
+        // by design — tabs live inside one window. `Window` can be reopened by
+        // id after the user closes it, which `AppCommands` exposes as a Window-
+        // menu item (App Store Guideline 4: a closed window must be reachable).
+        Window("XplistScalpel", id: AppWindow.mainID) {
             ContentView(app: app)
                 .onOpenURL { url in app.open(url: url) }
         }
         .commands {
             AppCommands(app: app)
         }
+    }
+}
+
+/// Menu command that reopens the single main window. Placed in the Window menu.
+/// SwiftUI only lists a `Window` there while it is open, so this is what brings
+/// it back once the user has closed it.
+private struct ReopenMainWindowButton: View {
+    @Environment(\.openWindow) private var openWindow
+    var body: some View {
+        Button("XplistScalpel Window") { openWindow(id: AppWindow.mainID) }
+            .keyboardShortcut("0", modifiers: .command)
     }
 }
 
@@ -156,6 +177,11 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("u", modifiers: .command)
             .disabled(doc == nil)
+        }
+
+        // Window menu — let the user reopen the main window after closing it.
+        CommandGroup(after: .windowArrangement) {
+            ReopenMainWindowButton()
         }
     }
 }

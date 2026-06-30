@@ -24,6 +24,13 @@ final class AppModel {
     var recentFiles: [URL] = []
     var lastError: String?
 
+    /// Brings the single main window back on screen. The scene installs this
+    /// once a window exists (see `ContentView`); it lets non-view code — the
+    /// app delegate's file-open handlers and the File-menu commands — reopen
+    /// the window after the user has closed it, so opening or creating a file
+    /// is never a no-op against a window-less app.
+    @ObservationIgnored var showMainWindow: (() -> Void)?
+
     // File-dialog triggers observed by ContentView.
     var isOpenPanelPresented = false
     var isExportPanelPresented = false
@@ -51,6 +58,7 @@ final class AppModel {
     // MARK: - Document lifecycle
 
     func newDocument() {
+        showMainWindow?()
         let doc = PlistDocument.newDocument()
         documents.append(doc)
         activeDocumentID = doc.id
@@ -58,6 +66,7 @@ final class AppModel {
     }
 
     func open(url: URL) {
+        showMainWindow?()
         NSLog("[XS] open url=\(url.path) isFileURL=\(url.isFileURL) scopedGrant=start")
         if let existing = documents.first(where: { $0.fileURL?.standardizedFileURL == url.standardizedFileURL }) {
             activeDocumentID = existing.id
@@ -114,7 +123,10 @@ final class AppModel {
 
     // MARK: - Saving
 
-    func requestOpen() { isOpenPanelPresented = true }
+    func requestOpen() {
+        showMainWindow?()
+        isOpenPanelPresented = true
+    }
 
     func save(_ doc: PlistDocument? = nil) {
         guard let doc = doc ?? activeDocument else { return }

@@ -11,6 +11,7 @@ import UniformTypeIdentifiers
 
 struct ContentView: View {
     @Bindable var app: AppModel
+    @Environment(\.openWindow) private var openWindow
 
     private let openTypes: [UTType] = [.propertyList, .xml, .data, .item]
 
@@ -42,6 +43,12 @@ struct ContentView: View {
             }
         }
         .frame(minWidth: 840, minHeight: 540)
+        .onAppear {
+            // Capture the window-opening action so non-view code (the app
+            // delegate's file handlers, AppModel) can reopen this window after
+            // it's been closed. The action stays valid for the app's lifetime.
+            app.showMainWindow = { openWindow(id: AppWindow.mainID) }
+        }
         .fileImporter(isPresented: $app.isOpenPanelPresented,
                       allowedContentTypes: openTypes,
                       allowsMultipleSelection: true) { result in
